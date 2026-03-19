@@ -2,6 +2,7 @@ var express = require('express');
 var router = express.Router();
 let slugify = require('slugify');
 let productModel = require('../schemas/products')
+let inventoryModel = require('../schemas/inventories')
 
 /* GET users listing. */
 router.get('/', async function (req, res, next) {
@@ -71,21 +72,36 @@ router.get('/:id', async function (req, res, next) {
 // });
 //CREATE UPDATE DELETE
 router.post('/', async function (req, res) {
-    let newProduct = new productModel({
-        title: req.body.title,
-        slug: slugify(req.body.title, {
-            replacement: '-',
-            remove: undefined,
-            lower: true,
-            strict: true
-        }),
-        price: req.body.price,
-        description: req.body.description,
-        category: req.body.category,
-        images: req.body.images
-    })
-    await newProduct.save()
-    res.send(newProduct)
+    let newProduct;
+    try {
+        newProduct = new productModel({
+            title: req.body.title,
+            slug: slugify(req.body.title, {
+                replacement: '-',
+                remove: undefined,
+                lower: true,
+                strict: true
+            }),
+            price: req.body.price,
+            description: req.body.description,
+            category: req.body.category,
+            images: req.body.images
+        })
+        await newProduct.save()
+        await inventoryModel.create({
+            product: newProduct._id
+        })
+        res.send(newProduct)
+    } catch (error) {
+        if (newProduct && newProduct._id) {
+            try {
+                await productModel.findByIdAndDelete(newProduct._id)
+            } catch (cleanupError) { }
+        }
+        res.status(400).send({
+            message: error.message
+        })
+    }
 })
 router.put('/:id', async function (req, res) {
 
