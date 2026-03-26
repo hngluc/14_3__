@@ -1,18 +1,19 @@
 var express = require('express');
 var router = express.Router();
 let slugify = require('slugify');
+let mongoose = require('mongoose');
 let productModel = require('../schemas/products')
 let inventoryModel = require('../schemas/inventories')
 
 /* GET users listing. */
 router.get('/', async function (req, res, next) {
     let queries = req.query;
-    let titleQ = queries.title ? queries.title.toLowerCase() :'';
+    let titleQ = queries.title ? queries.title.toLowerCase() : '';
     let max = queries.max ? queries.max : 10000;
     let min = queries.min ? queries.min : 0;
     let data = await productModel.find({
         isDeleted: false,
-        title: new RegExp(titleQ,'i'),
+        title: new RegExp(titleQ, 'i'),
         price: {
             $gte: min,
             $lte: max
@@ -72,9 +73,10 @@ router.get('/:id', async function (req, res, next) {
 // });
 //CREATE UPDATE DELETE
 router.post('/', async function (req, res) {
-    let newProduct;
+    let session = await mongoose.startSession();
+    let transaction = session.startTransaction()
     try {
-        newProduct = new productModel({
+        let newProduct = new productModel({
             title: req.body.title,
             slug: slugify(req.body.title, {
                 replacement: '-',
@@ -87,20 +89,21 @@ router.post('/', async function (req, res) {
             category: req.body.category,
             images: req.body.images
         })
-        await newProduct.save()
-        await inventoryModel.create({
-            product: newProduct._id
+        await newProduct.save({ session })
+        console.log(newProduct);
+        let newInventory = new inventoryModel({
+            product: newProduct._id,
+            stock: -1
         })
-        res.send(newProduct)
+        await newInventory.save({ session })
+        await newInventory.populate('product')
+        session.commitTransaction();
+        session.endSession()
+        res.send(newInventory)
     } catch (error) {
-        if (newProduct && newProduct._id) {
-            try {
-                await productModel.findByIdAndDelete(newProduct._id)
-            } catch (cleanupError) { }
-        }
-        res.status(400).send({
-            message: error.message
-        })
+        session.abortTransaction();
+        session.endSession()
+        res.status(404).send(error.message)
     }
 })
 router.put('/:id', async function (req, res) {

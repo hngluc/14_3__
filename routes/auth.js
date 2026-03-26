@@ -8,11 +8,18 @@ const { check } = require('express-validator')
 const { checkLogin } = require('../utils/authHandler')
 
 router.post('/register', RegisterValidator, validatedResult, async function (req, res, next) {
-    let { username, password, email } = req.body;
-    let newUser = await userController.CreateAnUser(
-        username, password, email, '69b2763ce64fe93ca6985b56'
-    )
-    res.send(newUser)
+    try {
+        let { username, password, email } = req.body;
+        let newUser = await userController.CreateAnUser(
+            username, password, email, '69b2763ce64fe93ca6985b56'
+        )
+        res.send(newUser)
+    } catch (error) {
+        res.status(404).send({
+            message: error.message
+        })
+    }
+
 })
 router.post('/login', async function (req, res, next) {
     let { username, password } = req.body;
@@ -51,7 +58,7 @@ router.post('/login', async function (req, res, next) {
     }
 
 })
-router.get('/me',checkLogin, function (req,res,next) {
+router.get('/me', checkLogin, function (req, res, next) {
     res.send(req.user)
 })
 
