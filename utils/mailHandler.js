@@ -21,5 +21,19 @@ module.exports = {
         });
 
         console.log("Message sent:", info.messageId);
+    },
+    sendPasswordMail: async function (to, username, password) {
+        const info = await transporter.sendMail({
+            from: 'hehehe@gmail.com',
+            to: to,
+            subject: "Thong tin tai khoan cua ban",
+            text: `Username: ${username}\nPassword: ${password}`,
+            html: `<h3>Chào ${username},</h3>
+                   <p>Tài khoản của bạn đã được tạo thành công.</p>
+                   <p><b>Username:</b> ${username}</p>
+                   <p><b>Password:</b> ${password}</p>
+                   <p>Vui lòng đổi mật khẩu sau khi đăng nhập lần đầu.</p>`,
+        });
+        console.log("Password mail sent to:", to, info.messageId);
     }
 }

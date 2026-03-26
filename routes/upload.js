@@ -8,6 +8,7 @@ let productsModel = require('../schemas/products')
 let inventoriesModel = require('../schemas/inventories')
 let mongoose = require('mongoose')
 let slugify = require('slugify')
+let userModel = require('../schemas/users')
 
 router.post('/one_file', uploadImage.single('file'), function (req, res, next) {
     res.send({
@@ -116,4 +117,94 @@ router.post('/excel', uploadExcel.single('file'), async function (req, res, next
     }
     res.send(result)
 })
+
+router.post('/users/excel', uploadExcel.single('file'), async function (req, res, next) {
+    try {
+    let crypto = require('crypto');
+    let roleModel = require('../schemas/roles');
+    let { sendPasswordMail } = require('../utils/mailHandler');
+
+    if (!req.file) {
+        return res.status(400).send({ message: 'Vui long chon file Excel (.xlsx)' });
+    }
+
+    let workBook = new excelJs.Workbook();
+    let pathFile = path.join(__dirname, '../uploads', req.file.filename);
+    await workBook.xlsx.readFile(pathFile);
+    let worksheet = workBook.worksheets[0];
+    
+    // Tìm role "user" trong DB
+    let userRole = await roleModel.findOne({ name: /user/i });
+    if (!userRole) {
+        return res.status(400).send({ message: 'Role "user" chua ton tai trong DB. Hay tao role truoc.' });
+    }
+
+    let result = [];
+    let getUsers = await userModel.find({});
+    let getEmails = getUsers.map(u => u.email);
+    let getUsernames = getUsers.map(u => u.username);
+
+    for (let index = 2; index <= worksheet.rowCount; index++) {
+        let rowError = [];
+        const row = worksheet.getRow(index);
+        let username = row.getCell(1).value;
+        let emailRaw = row.getCell(2).value;
+        
+        if (!username || !emailRaw) {
+            continue;
+        }
+
+        let email = typeof emailRaw === 'object' ? (emailRaw.text || emailRaw.hyperlink) : emailRaw;
+
+        if (getUsernames.includes(username)) {
+            rowError.push("Username đã tồn tại: " + username);
+        }
+        if (getEmails.includes(email)) {
+            rowError.push("Email đã tồn tại: " + email);
+        }
+
+        if (rowError.length > 0) {
+            result.push({
+                success: false,
+                data: rowError
+            });
+            continue;
+        }
+
+        try {
+            // Random password 16 ký tự
+            let randomPassword = crypto.randomBytes(8).toString('hex'); // 16 chars
+
+            let newUser = new userModel({
+                username: username.toString().trim(),
+                email: email.toString().trim(),
+                password: randomPassword,
+                role: userRole._id
+            });
+            await newUser.save();
+
+            // Gửi email password cho user
+            try {
+                await sendPasswordMail(email, username, randomPassword);
+            } catch (mailErr) {
+                console.error('Gui mail that bai cho', email, mailErr.message);
+            }
+
+            result.push({
+                success: true,
+                data: newUser
+            });
+        } catch (error) {
+            result.push({
+                success: false,
+                data: error.message
+            });
+        }
+    }
+    res.send(result);
+    } catch (err) {
+        res.status(500).send({ message: err.message });
+    }
+});
+
 module.exports = router;
