@@ -1,9 +1,9 @@
 var express = require('express');
 var router = express.Router();
 let slugify = require('slugify');
-let mongoose = require('mongoose');
 let productModel = require('../schemas/products')
 let inventoryModel = require('../schemas/inventories')
+let mongoose = require('mongoose')
 
 /* GET users listing. */
 router.get('/', async function (req, res, next) {
@@ -74,7 +74,7 @@ router.get('/:id', async function (req, res, next) {
 //CREATE UPDATE DELETE
 router.post('/', async function (req, res) {
     let session = await mongoose.startSession();
-    let transaction = session.startTransaction()
+    session.startTransaction()
     try {
         let newProduct = new productModel({
             title: req.body.title,
@@ -90,19 +90,18 @@ router.post('/', async function (req, res) {
             images: req.body.images
         })
         await newProduct.save({ session })
-        console.log(newProduct);
         let newInventory = new inventoryModel({
             product: newProduct._id,
             stock: -1
         })
         await newInventory.save({ session })
         await newInventory.populate('product')
-        session.commitTransaction();
-        session.endSession()
+        await session.commitTransaction();
+        await session.endSession()
         res.send(newInventory)
     } catch (error) {
-        session.abortTransaction();
-        session.endSession()
+        await session.abortTransaction();
+        await session.endSession()
         res.status(404).send(error.message)
     }
 })

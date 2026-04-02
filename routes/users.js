@@ -2,14 +2,11 @@ var express = require("express");
 var router = express.Router();
 let { validatedResult, CreateUserValidator, ModifyUserValidator } = require("../utils/validator")
 let userModel = require("../schemas/users");
-let bcrypt = require('bcrypt')
 let userController = require("../controllers/users");
-const { checkLogin } = require("../utils/authHandler");
+const { checkLogin,checkRole } = require("../utils/authHandler");
 
 
-
-
-router.get("/", checkLogin, async function (req, res, next) {
+router.get("/", checkLogin,checkRole("ADMIN","MODERATOR"), async function (req, res, next) {
   let users = await userModel
     .find({ isDeleted: false })
   res.send(users);

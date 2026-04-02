@@ -21,7 +21,5 @@ let inventorySchema = mongoose.Schema({
         min: 0,
         default: 0
     }
-
 })
-
 module.exports = mongoose.model('inventory', inventorySchema)
